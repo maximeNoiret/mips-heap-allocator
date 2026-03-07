@@ -54,10 +54,58 @@ jr   $ra                    # return ($v0 is already what we want from sbrk sysc
 # Output:
 #     $v0: Pointer to allocated space.
 # Registers used:
-#     None
+#     $t0: $a1 even check -> free list iterator -> header pointer
+#     $t1: current chunk size -> less-than bool -> original chunk size -> new unallocated split size
+#     $t2: footer pointer -> split header pointer
+#     $t3: split footer pointer
 # Note:
 #     $a0 is the POINTER to heap_start, not the actual value. This makes calls easier with data segment vars.
 heap_malloc:
+# check that $a1 is even
+andi $t0, $a1, 1                             # check even
+bnez $t0, heap_malloc_incorrect_size         # if $a1 off, return NULL (TODO)
+
+lw   $t0, 4($a0)                             # get first_free
+
+heap_malloc_find_chunk:
+  lw    $t1, 0($t0)                          # get chunk size
+  addiu $t1, $t1, 16                         # chunk size + 16
+  sltu  $t1, $t1, $a1                        # if chunk size + 16 !< desired size, aka if desired size <= chunk size + 16
+  beq   $t1, $zero, heap_malloc_found        # break;
+  lw    $t0, 8($t0)                          # else, get next
+  beq   $t0, $zero, heap_malloc_not_found    # if next is null, no chunks apply. TODO: sbrk more space
+  j     heap_malloc_find_chunk               # else, continue
+
+heap_malloc_not_found:
+break 1                                      # if no chunks work, FOR NOW, break execution
+
+heap_malloc_found:
+ori   $v0, $zero, $t0
+addiu $v0, $v0, 4                            # set return value to header+4 (chunk data pointer)
+lw    $t1, 0($t0)                            # save original chunk size
+ori   $a1, $a1, 1                            # mark chunk as allocated
+sw    $a1, 0($t0)                            # store new size in header
+addiu $t2, $t0, 4                            # header + 4
+addu  $t2, $t0, $a1                          # (header + 4) + new_size = footer
+sw    $a1, 0($t2)                            # store new size in footer
+andi  $a1, $a1, 0xFFFFFFFE                   # remove allocated bit from size for calculation
+subu  $t1, $t1, $a1                          # original_chunk_size - new_size
+subiu $t1, $t1, 8                            # (original_chunk_size - new_size) - 8 = new unallocated split size
+addiu $t2, $t2, 4                            # get split header pointer
+sw    $t1, 0($t2)                            # store split size in split header
+addiu $t3, $t2, 4                            # skip header
+addu  $t3, $t3, $t1                          # go to split footer
+sw    $t1, 0($t3)                            # store split size in split footer
+
+# TODO:
+#   - If prev is null, update first_free
+#   - Else, Iterate through previous neighbors until unallocated to update its next pointer
+#   - If next not null, Iterate through next neighbors until unallocated to update its prev pointer
+
+jr   $ra                                     # return
+  
+
+
 
 
 

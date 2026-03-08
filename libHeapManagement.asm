@@ -132,20 +132,78 @@ jr   $ra                                     # return
 # Ouptut:
 #     None
 # Registers used:
-#     $t0: header pointer
+#     $t0: header pointer -> footer pointer -> heap_start -> prevN_size -> header pointer -> footer pointer -> nextN_size
+#     $t1: header size
+#     $t2: is prev allocated -> is next allocated -> prevN
+#     $t3: is next allocated
 heap_free:
-addiu $t0, $a1, -4                          # get chunk header pointer
 # mark chunk as unallocated
 lw    $t1, -4($a1)                          # get chunk size
-addiu $t1, $t0, -1                          # mark as unallocated
-sw    $t1, -4($a1)                          # store back (might be useless in every case?)
+addiu $t1, $t1, -1                          # mark as unallocated
+sw    $t1, -4($a1)                          # store back
+ori   $t0, $zero, $a1                       # get chunk header pointer
+addu  $t0, $t0, $t1                         # go to footer
+sw    $t1, 0($t0)                           # update footer size to mark unallocated
+
+# check first chunk
+lw    $t0, 0($a0)                           # get heap_start
+beq   $t0, $a1, heap_free_firstChunk        # if p == heap_start, process as first chunk
+# check previous neighbor
+lw    $t0, -8($a1)                          # else, load size of previous neighbor
+andi  $t2, $t0, 1                           # check whether previous neighbor is allocated
+beq   $t2, $zero, heap_free_prevFree        # if previous neighbor unallocated, process
+# check next neighbor
+addu  $t0, $a1, $t1                         # else, goto footer
+lw    $t0, 4($t0)                           # skip footer to load next neighbor's size
+andi  $t2, $t0, 1                           # check whether next neighbor is allocated
+beq   $t2, $zero, heap_free_nextFree        # if next neighbor unallocated, process
+# neither neighbor is unallocated.
+# TODO: process "none unallocated" case
+
+heap_free_firstChunk:
+addu  $t0, $a1, $t1                         # go to p footer
+lw    $t0, 4($t0)                           # get next's size
+andi  $t0, $t0, 1                           # check if next neighbor allocated
+beq   $t0, $zero, heap_free_firstChunkNext  # if unallocated, process firstChunk & nextFree case
+lw    $t0, 4($a0)                           # else, get first unallocated chunk
+sw    $a1, 4($t0)                           # set prevptr of that chunk to p  (wasteful if next chunk)
+sw    $t0, 8($a1)                           # set p's nextptr to that chunk   (wasteful if next chunk)
+sw    $a1, 4($a0)                           # update first_free to p
+j     return
+
+heap_free_firstChunkNext:
+sw    $a1, 4($a0)                           # update first_free to p
+j     heap_free_bothFree                    # go on to both free case
+
+heap_free_prevFree:
+subu  $t2, $a1, $t0                         # go back by size of previous chunk
+addiu $t2, $t0, -12                         # get previous header: go back p header, prev foot and prev header (3*4 = 12)
+addu  $t1, $t0, $t1                         # get sum of previous chunk size and p size
+addiu $t1, $t1, 8                           # add 8 since 2 tags will be deleted
+sw    $t1, 0($t2)                           # update header size value
+or    $a1, $zero, $t2                       # set p to previous header
+addiu $t2, $t2, $t1                         # goto footer(-4)
+# TODO: check if next is free. if not,
+lw    $t0, 8($t2)                           # get next chunk size
+andi  $t3, $t0, 1                           # check if next chunk is allocated
+beq   $t3, $zero, heap_free_bothFree        # if next neighbor unallocated, process
+sw    $t1, 4($t2)                           # else, update footer size value
+j     return
+
+
+heap_free_bothFree:
+
+
+
+heap_free_nextFree:
+
 
 # TODO:
 #   - Select which case we are in:
 #   - 1. The previous neighbor is unallocated or NULL
 #        1. if chunk at beginning of heap, update first_free to header
-#           else, fuse chunk with previous neighbor
-#        2. set chunk header to header of previous neighbor
+#           else, - fuse chunk with previous neighbor
+#                 - set chunk header to header of previous neighbor
 #   - 2. Both neighbors are unallocated (sequentially with case 1)
 #        1. fuse chunk with next neighbor
 #        2. set header's nextptr to next neighbor's nextptr
@@ -162,3 +220,8 @@ sw    $t1, -4($a1)                          # store back (might be useless in ev
 #        4. set ptr's prevptr to p                                [4(ptr)  = p]
 #        5. if prevptr not NULL, set p's prev's nextptr to p      [8(4(p)) = p]
 #           else, update first_free to p
+
+
+
+return:
+jr    $ra

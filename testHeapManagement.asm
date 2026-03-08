@@ -14,6 +14,8 @@ malloc_LI(heap_start, 24)
 addi $sp, $sp, -4            # allocate a word in stack
 sw   $v0, 0($sp)             # store pointer to allocated space in stack
 
+malloc_LI(heap_start, 32)    # allocate a second chunk to test first+alloc
+
 # test writing to allocated space
 lw   $t0, 0($sp)             # get space pointer
 ori  $t1, $t1, 100           # value 100

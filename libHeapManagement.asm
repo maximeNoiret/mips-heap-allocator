@@ -128,9 +128,37 @@ jr   $ra                                     # return
 # Function heap_free
 # Input:
 #     $a0: Pointer to heap_start.
-#     $a1: Pointer to allocated space to free.
+#     $a1: p Pointer to allocated space to free.
 # Ouptut:
 #     None
 # Registers used:
-#     None
+#     $t0: header pointer
 heap_free:
+addiu $t0, $a1, -4                          # get chunk header pointer
+# mark chunk as unallocated
+lw    $t1, -4($a1)                          # get chunk size
+addiu $t1, $t0, -1                          # mark as unallocated
+sw    $t1, -4($a1)                          # store back (might be useless in every case?)
+
+# TODO:
+#   - Select which case we are in:
+#   - 1. The previous neighbor is unallocated or NULL
+#        1. if chunk at beginning of heap, update first_free to header
+#           else, fuse chunk with previous neighbor
+#        2. set chunk header to header of previous neighbor
+#   - 2. Both neighbors are unallocated (sequentially with case 1)
+#        1. fuse chunk with next neighbor
+#        2. set header's nextptr to next neighbor's nextptr
+#        3. if nextptr not NULL, set next's prevptr to header
+#   - 3. The previous neighbor is allocated but the next neighbor is unallocated
+#        1. move next neighbor's prevptr and nextptr to header
+#        2. if nextptr not NULL, set next's prevptr to header
+#        3. if prevptr not NULL, set prev's nextptr to header
+#           else, update first_free to header
+#   - 4. Neither neighbors are unallocated
+#        1. iterate through free list from first_free until ptr > p
+#        2. set p's nextptr to ptr                                [8(p)    = ptr]
+#        3. set p's prevptr to ptr's prevptr                      [4(p)    = 4(ptr)]
+#        4. set ptr's prevptr to p                                [4(ptr)  = p]
+#        5. if prevptr not NULL, set p's prev's nextptr to p      [8(4(p)) = p]
+#           else, update first_free to p

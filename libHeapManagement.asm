@@ -5,7 +5,7 @@
 #     $v0: pointer to heap_start
 # Registers used:
 #     $t0: heap_start pointer arithmetic
-#     $t1: chunk size
+#     $t1: last address -> chunk size
 #     $t2: footer pointer
 # Note:
 #     The caller is in charge of storing the pointer to the allocation. 
@@ -16,16 +16,18 @@ heap_init:
 # sbrk allocation
 ori   $v0, $zero, 9          # load syscall code 9 (sbrk)
 ori   $a0, $zero, 4096       # load value 4096 (to allocate 4096 bytes) [this might get replaced by arg]
-syscall                     # sbrk 4096 bytes
+syscall                      # sbrk 4096 bytes
 
 # setup heap metadata
 or    $t0, $zero, $v0        # t0 = v0 for pointer arithmetic
-addiu $t0, $t0, 8            # get heap_start
+addiu $t0, $t0, 12           # get heap_start
 sw    $t0, 0($v0)            # store heap_start
 sw    $t0, 4($v0)            # store first_free (same value)
+addu  $t1, $v0, $a0          # get last possible address
+sw    $t1, 8($v0)            # store last possible address
 
 # setup unallocated chunk
-ori   $t1, $zero, 4080       # get chunk size = sbrk allocation - 8 (metadata) - 8 (boundary tags)
+ori   $t1, $zero, 4076       # get chunk size = sbrk allocation - 12 (metadata) - 8 (boundary tags)
 sw    $t1, 0($t0)            # store chunk size into header
 sw    $zero, 4($t0)          # set prev to null
 sw    $zero, 8($t0)          # set next to null
@@ -33,8 +35,6 @@ addiu $t2, $t0, 4            # skip header
 addu  $t2, $t2, $t1          # go to chunk footer
 sw    $t1, 0($t2)            # store chunk size into footer
 jr    $ra                    # return ($v0 is already what we want from sbrk syscall)
-
-
 
 
 
@@ -71,7 +71,7 @@ heap_malloc_find_chunk:
   beq   $t0, $zero, heap_malloc_not_found    # if next is null, no chunks apply. TODO: sbrk more space
   j     heap_malloc_find_chunk               # else, continue
 
-heap_malloc_incorrect_size: # TODO
+heap_malloc_incorrect_size: # TODO: allocate more space with sbrk
 heap_malloc_not_found:
 break 1                                      # if no chunks work, FOR NOW, break execution
 
@@ -96,7 +96,7 @@ sw    $t1, 0($t2)                            # store split size in split header
 addiu $t3, $t2, 4                            # skip header
 addu  $t3, $t3, $t1                          # go to split footer
 sw    $t1, 0($t3)                            # store split size in split footer
-# move prev and next into new split chunk and update free list
+# update free list
 lw    $t1, 4($t0)                            # get prev pointer
 sw    $t1, 4($t2)                            # store it in new split chunk
 beq   $t1, $zero, heap_malloc_prevptr_null   # if null, update first_free
@@ -119,8 +119,6 @@ jr   $ra                                     # return
   
 
 
-
-
 # Function heap_free
 # Input:
 #     $a0: Pointer to heap_start.
@@ -137,13 +135,14 @@ heap_free:
 lw    $t1, -4($a1)                          # get chunk size
 addiu $t1, $t1, -1                          # mark as unallocated
 sw    $t1, -4($a1)                          # store back
-ori   $t0, $zero, $a1                       # get chunk header pointer
+or    $t0, $zero, $a1                       # get chunk header pointer
 addu  $t0, $t0, $t1                         # go to footer
 sw    $t1, 0($t0)                           # update footer size to mark unallocated
 
 # check first chunk
 lw    $t0, 0($a0)                           # get heap_start
-beq   $t0, $a1, heap_free_firstChunk        # if p == heap_start, process as first chunk
+addiu $t0, $t0, 4                           # offset from header like p
+beq   $t0, $a1, heap_free_firstChunk        # if p == heap_start+4, process as first chunk
 # check previous neighbor
 lw    $t0, -8($a1)                          # else, load size of previous neighbor
 andi  $t2, $t0, 1                           # check whether previous neighbor is allocated
@@ -158,19 +157,24 @@ beq   $t2, $zero, heap_free_nextFree        # if next neighbor unallocated, proc
 j     return
 
 heap_free_firstChunk:
-addu  $t0, $a1, $t1                         # go to p footer
-lw    $t0, 4($t0)                           # get next's size
-andi  $t0, $t0, 1                           # check if next neighbor allocated
-beq   $t0, $zero, heap_free_firstChunkNext  # if unallocated, process firstChunk & nextFree case
+sw    $zero, 0($a1)                         # set p's prevptr to NULL
+addu  $t2, $a1, $t1                         # go to p footer
+lw    $t0, 4($t2)                           # get next's size
+andi  $t3, $t0, 1                           # check if next neighbor allocated
+beq   $t3, $zero, heap_free_firstChunkNext  # if unallocated, process firstChunk & nextFree case
 lw    $t0, 4($a0)                           # else, get first unallocated chunk
 # update free list
 sw    $a1, 4($t0)                           # set prevptr of that chunk to p
-sw    $t0, 8($a1)                           # set p's nextptr to that chunk
-sw    $a1, 4($a0)                           # update first_free to p
+sw    $t0, 4($a1)                           # set p's nextptr to that chunk
+addiu $a1, $a1, -4                          # get p header pointer
+sw    $a1, 4($a0)                           # update first_free to p header
+addiu $a1, $a1, 4                           # set p back
 j     return
 
 heap_free_firstChunkNext:
-sw    $a1, 4($a0)                           # update first_free to p
+addiu $a1, $a1, -4                          # get p header pointer
+sw    $a1, 4($a0)                           # update first_free to p header
+addiu $a1, $a1, 4                           # set p back
 j     heap_free_bothFree                    # go on to both free case
 
 heap_free_prevFree:
@@ -182,7 +186,7 @@ addiu $t1, $t1, 8                           # add 8 since 2 tags will be deleted
 sw    $t1, 0($t2)                           # update header size value
 addiu $t2, $t2, 4                           # goto chunk data section
 or    $a1, $zero, $t2                       # set p to that
-addiu $t2, $t2, $t1                         # goto footer
+addu  $t2, $t2, $t1                         # goto footer
 lw    $t0, 4($t2)                           # get next chunk size
 andi  $t3, $t0, 1                           # check if next chunk is allocated
 beq   $t3, $zero, heap_free_bothFree        # if next neighbor unallocated, process
@@ -194,7 +198,7 @@ heap_free_bothFree:
 addu  $t0, $t0, $t1                         # get sum of current chunk size and next chunk size
 addiu $t0, $t0, 8                           # add 8 since 2 tags will be deleted
 sw    $t0, -4($a1)                          # update header with new size
-addiu $t1, $a1, $t0                         # go to new footer
+addu  $t1, $a1, $t0                         # go to new footer
 sw    $t0, 0($t1)                           # update footer with new size
 # update free list
 lw    $t3, 12($t2)                          # get next neighbor's nextptr

@@ -19,6 +19,8 @@ lw   $t0, 0($sp)             # get space pointer
 ori  $t1, $t1, 100           # value 100
 sw   $t1, 0($t0)             # store 100 in allocated space
 
+free_LR(heap_start, $t0)     # attempt to free space
+
 ori	 $v0, $zero, 10          # load syscall code 10 (exit)
 syscall                      # exit
 

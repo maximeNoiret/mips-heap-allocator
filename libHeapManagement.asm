@@ -90,6 +90,7 @@ sw    $a1, 0($t2)                            # store new size in footer
 addi  $a1, $a1, -1                           # remove allocated bit from size for calculation
 # create split chunk
 subu  $t1, $t1, $a1                          # original_chunk_size - new_size
+beq   $t1, $zero, heap_malloc_nosplit        # if zero, don't create a new chunk. else, split:
 addiu $t1, $t1, -8                           # (original_chunk_size - new_size) - 8 = new unallocated split size
 addiu $t2, $t2, 4                            # get split header pointer
 sw    $t1, 0($t2)                            # store split size in split header
@@ -111,6 +112,9 @@ j     heap_malloc_return
 heap_malloc_prevptr_null:                    # if prev ptr was null,
 sw    $t2, 4($a0)                            #   update first_free with split chunk header pointer
 j     heap_malloc_update_next
+
+heap_malloc_nosplit:
+# hell naw I can't do that rn. :pray:
 
 heap_malloc_return:
 lw   $ra, 0($sp)                             # retrieve ra from stack
@@ -259,31 +263,6 @@ j     heap_free_return                          # }
 heap_free_nextFree_prevNull:                    # else,
 sw    $t0, 4($a0)                               #   update first_free to p
 j     heap_free_return                          # }
-
-
-# TODO:
-#   - Select which case we are in:
-#   - 1. The previous neighbor is unallocated or NULL [done]
-#        1. if chunk at beginning of heap, update first_free to header [done]
-#           else, - fuse chunk with previous neighbor [done]
-#                 - set chunk header to header of previous neighbor [done]
-#   - 2. Both neighbors are unallocated (sequentially with case 1) [done]
-#        1. fuse chunk with next neighbor [done]
-#        2. set header's nextptr to next neighbor's nextptr [done]
-#        3. if nextptr not NULL, set next's prevptr to header [done]
-#   - 3. The previous neighbor is allocated but the next neighbor is unallocated [done]
-#        1. move next neighbor's prevptr and nextptr to header [done]
-#        2. if nextptr not NULL, set next's prevptr to header [done]
-#        3. if prevptr not NULL, set prev's nextptr to header [done]
-#           else, update first_free to header [done]
-#   - 4. Neither neighbors are unallocated
-#        1. iterate through free list from first_free until ptr > p -- [done]
-#        2. set p's nextptr to ptr                                [8(p)    = ptr] -- [done]
-#        3. set p's prevptr to ptr's prevptr                      [4(p)    = 4(ptr)] -- [done]
-#        4. set ptr's prevptr to p                                [4(ptr)  = p] -- [done]
-#        5. if prevptr not NULL, set p's prev's nextptr to p      [8(4(p)) = p] -- [done]
-#           else, update first_free to p -- [done]
-
 
 
 heap_free_return:

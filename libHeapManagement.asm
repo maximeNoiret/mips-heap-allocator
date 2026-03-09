@@ -114,19 +114,7 @@ sw    $t2, 4($a0)                            #   update first_free with split ch
 j     heap_malloc_update_next
 
 heap_malloc_nosplit:
-# TODO: update free list
-# t is malloc target
-# n0 = unallocated chunk preceding t (not neighbor)
-# n1 = unallocated chunk following t (not neighbor)
-#
-# if t's nextptr not null:
-#   n1 = t's next
-#   n1's prevptr = t's prevptr
-# if t's prevptr not null:
-#   n0 = t's prev
-#   n0's nextptr = t's nextptr
-# else:
-#   first_free = t's nextptr
+# update free list
 lw   $t1, 8($t0)                             # get nextptr
 lw   $t2, 4($t0)                             # get prevptr
 beq  $t1, $zero, heap_malloc_ns_nextptr_null # if nextptr is null, skip

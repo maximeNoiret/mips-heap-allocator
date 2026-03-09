@@ -21,14 +21,16 @@ malloc_LI(heap_start, 128)
 sw   $v0, 8($sp)
 malloc_LI(heap_start, 32)
 sw   $v0, 4($sp)
-
-lw   $t0, 8($sp)
-free_LR(heap_start, $t0)     # free first chunk to leave space
-malloc_LI(heap_start, 8)     # allocate less space to test nextFree
-sw   $v0, 8($sp)
-malloc_LI(heap_start, 16)    # allocate less space to free
+malloc_LI(heap_start, 32)
+malloc_LI(heap_start, 32)
 sw   $v0, 0($sp)
-free_LR(heap_start, $v0)     # test free: [ALLOC],[TARGET],[UNALLOC],[ALLOC],[UNALLOC]->
+malloc_LI(heap_start, 32)
+
+lw   $t0, 4($sp)
+free_LR(heap_start, $t0)     # free third chunk to test <-[ALLOC],[TARGET],[ALLOC]...[UNALLOC]->
+
+lw   $t0, 0($sp)
+free_LR(heap_start, $t0)     # free middle chunk to test [ALLOC],[UNALLOC],[ALLOC],[TARGET][ALLOC][UNALLOC]->
 
 ori	 $v0, $zero, 10          # load syscall code 10 (exit)
 syscall                      # exit

@@ -114,7 +114,29 @@ sw    $t2, 4($a0)                            #   update first_free with split ch
 j     heap_malloc_update_next
 
 heap_malloc_nosplit:
-# hell naw I can't do that rn. :pray:
+# TODO: update free list
+# t is malloc target
+# n0 = unallocated chunk preceding t (not neighbor)
+# n1 = unallocated chunk following t (not neighbor)
+#
+# if t's nextptr not null:
+#   n1 = t's next
+#   n1's prevptr = t's prevptr
+# if t's prevptr not null:
+#   n0 = t's prev
+#   n0's nextptr = t's nextptr
+# else:
+#   first_free = t's nextptr
+lw   $t1, 8($t0)                             # get nextptr
+lw   $t2, 4($t0)                             # get prevptr
+beq  $t1, $zero, heap_malloc_ns_nextptr_null # if nextptr is null, skip
+sw   $t2, 4($t1)                             # next's prevptr = prevptr
+heap_malloc_ns_nextptr_null:
+beq  $t2, $zero, heap_malloc_ns_prevptr_null # if prevptr not null {
+sw   $t1, 8($t2)                             #   prev's nextptr = nextptr
+j    heap_malloc_return                      # }
+heap_malloc_ns_prevptr_null:                 # else,
+sw   $t1, 4($a0)                             #   first_free = nextptr
 
 heap_malloc_return:
 lw   $ra, 0($sp)                             # retrieve ra from stack

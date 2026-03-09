@@ -153,8 +153,29 @@ lw    $t1, 4($t0)                           # skip footer to load next neighbor'
 andi  $t2, $t1, 1                           # check whether next neighbor is allocated
 beq   $t2, $zero, heap_free_nextFree        # if next neighbor unallocated, process
 # neither neighbor is unallocated.
-# TODO: process "none unallocated" case
+# iterate through chunks to find where to insert p in free list
+lw   $t0, 4($a0)                            # get first_free for current_ptr
+heap_free_none_find_chunk:                  # [while current_ptr < p]
+  sltu $t1, $a1, $t0                        # check if current_ptr > p
+  bne  $t1, $zero, heap_free_none_found     # if current_ptr > p, break
+  lw   $t0, 8($t0)                          # else, go to next
+  j    heap_free_none_find_chunk
+heap_free_none_found:
+# by this point, $t0 is on the NEXT unallocated chunk AFTER p
+# set p's prev & next
+sw    $t0, 4($a1)                           # p's nextptr = current_ptr
+lw    $t1, 4($t0)                           # get current_ptr's prevptr
+sw    $t1, 0($a1)                           # p's prevptr = current_ptr's prevptr
+addiu $t2, $a1, -4                          # get p's ptr
+# update free list
+sw    $t2, 4($t0)                           # current_ptr's prevptr = p
+beq   $t1, $zero, heap_free_none_first      # if p's prevptr is null, update first_free
+sw    $t2, 8($t1)                           # else, p's prev's nextptr = p
 j     heap_free_return
+heap_free_none_first:                       # if p's prevptr is null,
+sw    $t2, 4($a0)                           # set first_free to p
+j     heap_free_return
+
 
 heap_free_firstChunk:
 sw    $zero, 0($a1)                         # set p's prevptr to NULL
@@ -250,18 +271,18 @@ j     heap_free_return                          # }
 #        1. fuse chunk with next neighbor [done]
 #        2. set header's nextptr to next neighbor's nextptr [done]
 #        3. if nextptr not NULL, set next's prevptr to header [done]
-#   - 3. The previous neighbor is allocated but the next neighbor is unallocated
+#   - 3. The previous neighbor is allocated but the next neighbor is unallocated [done]
 #        1. move next neighbor's prevptr and nextptr to header [done]
 #        2. if nextptr not NULL, set next's prevptr to header [done]
 #        3. if prevptr not NULL, set prev's nextptr to header [done]
 #           else, update first_free to header [done]
 #   - 4. Neither neighbors are unallocated
-#        1. iterate through free list from first_free until ptr > p
-#        2. set p's nextptr to ptr                                [8(p)    = ptr]
-#        3. set p's prevptr to ptr's prevptr                      [4(p)    = 4(ptr)]
-#        4. set ptr's prevptr to p                                [4(ptr)  = p]
-#        5. if prevptr not NULL, set p's prev's nextptr to p      [8(4(p)) = p]
-#           else, update first_free to p
+#        1. iterate through free list from first_free until ptr > p -- [done]
+#        2. set p's nextptr to ptr                                [8(p)    = ptr] -- [done]
+#        3. set p's prevptr to ptr's prevptr                      [4(p)    = 4(ptr)] -- [done]
+#        4. set ptr's prevptr to p                                [4(ptr)  = p] -- [done]
+#        5. if prevptr not NULL, set p's prev's nextptr to p      [8(4(p)) = p] -- [done]
+#           else, update first_free to p -- [done]
 
 
 

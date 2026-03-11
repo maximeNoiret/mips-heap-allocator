@@ -1,14 +1,18 @@
 # Function heap_init
 # Input:
-#     None  (potentially size of sbrk?)
+#     $a0: Pointer to heap_start (or NULL during first run)
+#     (potentially size of sbrk?)
 # Output:
-#     $v0: pointer to heap_start
+#     $v0: return value of sbrk (pointer to heap_start for first run)
 # Registers used:
 #     $t0: heap_start pointer arithmetic
 #     $t1: last address -> chunk size
 #     $t2: footer pointer
 # Note:
 #     The caller is in charge of storing the pointer to the allocation. 
+#     If this is the first time this function is ran (and only time it is ran manually), the return value should be stored.
+#     Otherwise, the return value is simply used by malloc to allocate a chunk.
+#     $a0 gets clobbered for the sbrk syscall.
 #     first_free is stored at heap_start + 4. 
 #       No need to store it, since every function asks for POINTER to heap_start.
 heap_init:
@@ -58,6 +62,7 @@ jr    $ra                    # return ($v0 is already what we want from sbrk sys
 #     $a1: Size of allocation in bytes.
 # Output:
 #     $v0: Pointer to allocated space.
+#     $v1: sbrk occured
 # Registers used:
 #     $t0: $a1 even check -> free list iterator -> header pointer
 #     $t1: current chunk size -> less-than bool -> original chunk size -> new unallocated split size -> prev ptr -> next ptr

@@ -11,7 +11,6 @@
 #     The caller is in charge of storing the pointer to the allocation. 
 #     first_free is stored at heap_start + 4. 
 #       No need to store it, since every function asks for POINTER to heap_start.
-#     Size MUST be even, as lsb is used as 'allocated' indicator.
 heap_init:
 # sbrk allocation
 ori   $v0, $zero, 9          # load syscall code 9 (sbrk)
@@ -51,14 +50,15 @@ jr    $ra                    # return ($v0 is already what we want from sbrk sys
 #     $t3: split footer pointer
 # Note:
 #     $a0 is the POINTER to heap_start, not the actual value. This makes calls easier with data segment vars.
+#     Size MUST be even, as lsb is used as 'allocated' indicator.
+#       There is no size correction, the caller is in charge of providing a correct size.
 heap_malloc:
-# save ra
-addi $sp, $sp, -4                            # allocate a word in stack
-sw   $ra, 0($sp)                             # store ra
-
 # check that $a1 is even
 andi $t0, $a1, 1                             # check even
 bnez $t0, heap_malloc_incorrect_size         # if $a1 off, return NULL (TODO)
+# save ra (TODO: move this where you really need to allocate it.)
+addi $sp, $sp, -4                            # allocate a word in stack
+sw   $ra, 0($sp)                             # store ra
 
 lw   $t0, 4($a0)                             # get first_free
 
@@ -130,7 +130,7 @@ heap_malloc_return:
 lw   $ra, 0($sp)                             # retrieve ra from stack
 addi $sp, $sp, 4                             # deallocate a word from stack
 jr   $ra                                     # return
-  
+
 
 
 # Function heap_free
@@ -152,7 +152,6 @@ sw    $t1, -4($a1)                          # store back
 or    $t0, $zero, $a1                       # get chunk header pointer
 addu  $t0, $t0, $t1                         # go to footer
 sw    $t1, 0($t0)                           # update footer size to mark unallocated
-
 # check first chunk
 lw    $t0, 0($a0)                           # get heap_start
 addiu $t0, $t0, 4                           # offset from header like p
@@ -166,6 +165,7 @@ addu  $t0, $a1, $t1                         # else, goto footer
 lw    $t1, 4($t0)                           # skip footer to load next neighbor's size
 andi  $t2, $t1, 1                           # check whether next neighbor is allocated
 beq   $t2, $zero, heap_free_nextFree        # if next neighbor unallocated, process
+
 # neither neighbor is unallocated.
 # iterate through chunks to find where to insert p in free list
 lw   $t0, 4($a0)                            # get first_free for current_ptr

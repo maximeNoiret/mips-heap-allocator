@@ -35,7 +35,22 @@ addu  $t2, $t2, $t1          # go to chunk footer
 sw    $t1, 0($t2)            # store chunk size into footer
 jr    $ra                    # return ($v0 is already what we want from sbrk syscall)
 
-
+# TODO:
+#     allocate more space with SBRK if no chunks apply to malloc.
+#     This requires modification to heap_init:
+#     1. first run
+#       - $a0 is NULL
+#       - run sbrk
+#       - create a single unallocated chunk covering the allocation
+#       - $v0 becomes pointer to heap_start
+#     2. malloc run
+#       - $a0 is heap_start
+#       - run sbrk
+#       - create an unallocated chunk covering the allocation
+#       - if last chunk from previous allocation is unallocated, fuse with it
+#       - $v0 becomes pointer to last unallocated chunk (which is then used by malloc)
+#     Note: I might add $a1 for heap_init for size of allocation to avoid running multiple times if more than 4076 bytes are needed.
+#           But, for now, still just 4096 bytes sbrk. If you need to malloc more than 4076 bytes for one pointer, what are you doing lol
 
 # Function heap_malloc
 # Input:

@@ -3,11 +3,12 @@
 #     $a0: Pointer to heap_start (or NULL during first run)
 #     (potentially size of sbrk?)
 # Output:
-#     $v0: return value of sbrk (pointer to heap_start for first run)
+#     $v0: Pointer to unallocated chunk (pointer to heap_start for first run)
 # Registers used:
 #     $t0: heap_start pointer arithmetic
 #     $t1: last address -> chunk size
 #     $t2: footer pointer
+#     $s0: saved $a0
 # Note:
 #     The caller is in charge of storing the pointer to the allocation. 
 #     If this is the first time this function is ran (and only time it is ran manually), the return value should be stored.
@@ -16,28 +17,52 @@
 #     first_free is stored at heap_start + 4. 
 #       No need to store it, since every function asks for POINTER to heap_start.
 heap_init:
+addiu $sp, $sp, -4                           # allocate 1 word in stack
+sw    $s0, 0($sp)                            # store $s0
+addiu $s0, $zero, $a0                        # move $a0 into $s0
 # sbrk allocation
-ori   $v0, $zero, 9          # load syscall code 9 (sbrk)
-ori   $a0, $zero, 4096       # load value 4096 (to allocate 4096 bytes) [this might get replaced by arg]
-syscall                      # sbrk 4096 bytes
+ori   $v0, $zero, 9                          # load syscall code 9 (sbrk)
+ori   $a0, $zero, 4096                       # load value 4096 (to allocate 4096 bytes) [this might get replaced by arg]
+syscall                                      # sbrk 4096 bytes
+
+beq   $s0, $zero, heap_init_skip_metadata    # skip meta data if ran by malloc
 
 # setup heap metadata
-or    $t0, $zero, $v0        # t0 = v0 for pointer arithmetic
-addiu $t0, $t0, 12           # get heap_start
-sw    $t0, 0($v0)            # store heap_start
-sw    $t0, 4($v0)            # store first_free (same value)
-addu  $t1, $v0, $a0          # get last possible address
-sw    $t1, 8($v0)            # store last possible address
+or    $t0, $zero, $v0                        # t0 = v0 for pointer arithmetic
+addiu $t0, $t0, 12                           # get heap_start
+sw    $t0, 0($v0)                            # store heap_start
+sw    $t0, 4($v0)                            # store first_free (same value)
+addu  $t1, $v0, $a0                          # get last possible address
+sw    $t1, 8($v0)                            # store last possible address
+addiu $a0, $a0, -1                           # remove 1 from size to counteract not first run logic
 
+heap_init_skip_metadata:
+addiu $a0, $a0, 1                            # add 1 to size if not first run for free logic
 # setup unallocated chunk
-ori   $t1, $zero, 4076       # get chunk size = sbrk allocation - 12 (metadata) - 8 (boundary tags)
-sw    $t1, 0($t0)            # store chunk size into header
-sw    $zero, 4($t0)          # set prev to null
-sw    $zero, 8($t0)          # set next to null
-addiu $t2, $t0, 4            # skip header
-addu  $t2, $t2, $t1          # go to chunk footer
-sw    $t1, 0($t2)            # store chunk size into footer
-jr    $ra                    # return ($v0 is already what we want from sbrk syscall)
+addiu $t1, $a0, -20                          # get chunk size = sbrk allocation - 12 (metadata) - 8 (boundary tags)
+sw    $t1, 0($t0)                            # store chunk size into header
+sw    $zero, 4($t0)                          # set prev to null
+sw    $zero, 8($t0)                          # set next to null
+addiu $t2, $t0, 4                            # skip header
+addu  $t2, $t2, $t1                          # go to chunk footer
+beq   $s0, $zero, heap_init_continue         # if not first run,
+addiu $t2, $t2, -1                           #   remove 1 to align to word-width
+heap_init_continue:                          # else,
+sw    $t1, 0($t2)                            #   store chunk size into footer
+
+bneq  $s0, $zero, heap_init_return           # if first run, finish
+addiu $sp, $sp, -4                           # else, allocate 1 word in stack
+sw    $ra, 0($sp)                            # store $ra in stack
+addiu $a0, $zero, $s0                        # store heap_start in $a0
+addiu $a1, $zero, $v0                        # store chunk pointer in $a1
+jal   heap_free                              # call free(heap_start, chunk), returns pointer to unallocated chunk
+lw    $ra, 0($sp)                            # restore $ra from stack
+addiu $sp, $sp, 4                            # deallocate 1 word from stack
+
+heap_init_return:
+lw    $s0, 0($sp)                            # restore $s0 from stack
+addiu $sp, $sp, 4                            # deallocate 1 word from stack
+jr    $ra                                    # return
 
 # TODO:
 #     allocate more space with SBRK if no chunks apply to malloc.
@@ -52,6 +77,7 @@ jr    $ra                    # return ($v0 is already what we want from sbrk sys
 #       - run sbrk
 #       - create an unallocated chunk covering the allocation
 #       - if last chunk from previous allocation is unallocated, fuse with it
+#       - else, update free list to include new chunk
 #       - $v0 becomes pointer to last unallocated chunk (which is then used by malloc)
 #     Note: I might add $a1 for heap_init for size of allocation to avoid running multiple times if more than 4076 bytes are needed.
 #           But, for now, still just 4096 bytes sbrk. If you need to malloc more than 4076 bytes for one pointer, what are you doing lol
@@ -76,9 +102,6 @@ heap_malloc:
 # check that $a1 is even
 andi $t0, $a1, 1                             # check even
 bnez $t0, heap_malloc_incorrect_size         # if $a1 off, return NULL (TODO)
-# save ra (TODO: move this where you really need to allocate it.)
-addi $sp, $sp, -4                            # allocate a word in stack
-sw   $ra, 0($sp)                             # store ra
 
 lw   $t0, 4($a0)                             # get first_free
 
@@ -92,8 +115,20 @@ heap_malloc_find_chunk:
   j     heap_malloc_find_chunk               # else, continue
 
 heap_malloc_incorrect_size: # TODO: allocate more space with sbrk
+break 1
+
 heap_malloc_not_found:
-break 1                                      # if no chunks work, FOR NOW, break execution
+# save ra
+addiu $sp, $sp, -8                            # allocate 2 words in stack
+sw    $a1, 4($sp)                             # store $a1
+sw    $ra, 0($sp)                             # store ra
+jal   heap_init                               # call init to expand program break
+addiu $t0, $zero, $v0                        # store resulting unallocated chunk in $t0
+lw    $ra, 0($sp)
+lw    $a1, 4($sp)
+addiu $sp, $sp, 8
+
+#break 1                                      # if no chunks work, FOR NOW, break execution
 
 heap_malloc_found:
 # update found chunk
@@ -158,7 +193,7 @@ jr   $ra                                     # return
 #     $a0: Pointer to heap_start.
 #     $a1: p Pointer to allocated space to free.
 # Ouptut:
-#     None
+#     $v0: Pointer to unallocated chunk (changes in case of coalescing)
 # Registers used (not detailed as too complicated):
 #     $t0
 #     $t1
@@ -241,7 +276,7 @@ addu  $t1, $t0, $t1                         # get sum of previous chunk size and
 addiu $t1, $t1, 8                           # add 8 since 2 tags will be deleted
 sw    $t1, 0($t2)                           # update header size value
 addiu $t2, $t2, 4                           # goto chunk data section
-or    $a1, $zero, $t2                       # set p to that
+addiu $a1, $zero, $t2                       # set p to that
 addu  $t2, $t2, $t1                         # goto footer
 lw    $t0, 4($t2)                           # get next chunk size
 andi  $t3, $t0, 1                           # check if next chunk is allocated
@@ -296,4 +331,5 @@ j     heap_free_return                          # }
 
 
 heap_free_return:
+addu  $v0, $a1, -4                              # set return value to header of p
 jr    $ra

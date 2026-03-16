@@ -50,7 +50,7 @@ addiu $t2, $t2, -1                           #   remove 1 to align to word-width
 heap_init_continue:                          # else,
 sw    $t1, 0($t2)                            #   store chunk size into footer
 
-bneq  $s0, $zero, heap_init_return           # if first run, finish
+bne   $s0, $zero, heap_init_return           # if first run, finish
 addiu $sp, $sp, -4                           # else, allocate 1 word in stack
 sw    $ra, 0($sp)                            # store $ra in stack
 addiu $a0, $zero, $s0                        # store heap_start in $a0
@@ -64,23 +64,6 @@ lw    $s0, 0($sp)                            # restore $s0 from stack
 addiu $sp, $sp, 4                            # deallocate 1 word from stack
 jr    $ra                                    # return
 
-# TODO:
-#     allocate more space with SBRK if no chunks apply to malloc.
-#     This requires modification to heap_init:
-#     1. first run
-#       - $a0 is NULL
-#       - run sbrk
-#       - create a single unallocated chunk covering the allocation
-#       - $v0 becomes pointer to heap_start
-#     2. malloc run
-#       - $a0 is heap_start
-#       - run sbrk
-#       - create an unallocated chunk covering the allocation
-#       - if last chunk from previous allocation is unallocated, fuse with it
-#       - else, update free list to include new chunk
-#       - $v0 becomes pointer to last unallocated chunk (which is then used by malloc)
-#     Note: I might add $a1 for heap_init for size of allocation to avoid running multiple times if more than 4076 bytes are needed.
-#           But, for now, still just 4096 bytes sbrk. If you need to malloc more than 4076 bytes for one pointer, what are you doing lol
 
 # Function heap_malloc
 # Input:
@@ -100,10 +83,10 @@ jr    $ra                                    # return
 #       There is no size correction, the caller is in charge of providing a correct size.
 heap_malloc:
 # check that $a1 is even
-andi $t0, $a1, 1                             # check even
-bnez $t0, heap_malloc_incorrect_size         # if $a1 off, return NULL (TODO)
+andi  $t0, $a1, 1                             # check even
+bnez  $t0, heap_malloc_incorrect_size         # if $a1 odd, return NULL
 
-lw   $t0, 4($a0)                             # get first_free
+lw    $t0, 4($a0)                             # get first_free
 
 heap_malloc_find_chunk:
   lw    $t1, 0($t0)                          # get chunk size
@@ -114,21 +97,20 @@ heap_malloc_find_chunk:
   beq   $t0, $zero, heap_malloc_not_found    # if next is null, no chunks apply. TODO: sbrk more space
   j     heap_malloc_find_chunk               # else, continue
 
-heap_malloc_incorrect_size: # TODO: allocate more space with sbrk
-break 1
+heap_malloc_incorrect_size:
+xor   $v0, $v0                               # set return value to 0
+j     heap_malloc_return                     # return 0
 
 heap_malloc_not_found:
 # save ra
-addiu $sp, $sp, -8                            # allocate 2 words in stack
-sw    $a1, 4($sp)                             # store $a1
-sw    $ra, 0($sp)                             # store ra
-jal   heap_init                               # call init to expand program break
-addiu $t0, $zero, $v0                        # store resulting unallocated chunk in $t0
-lw    $ra, 0($sp)
-lw    $a1, 4($sp)
-addiu $sp, $sp, 8
-
-#break 1                                      # if no chunks work, FOR NOW, break execution
+addiu $sp, $sp, -8                           # allocate 2 words in stack
+sw    $a1, 4($sp)                            # store $a1
+sw    $ra, 0($sp)                            # store ra
+jal   heap_init                              # call init to expand program break
+addiu $t0, $zero, $v0                        # store resulting unallocated chunk pointer in $t0
+lw    $ra, 0($sp)                            # restore $ra from stack
+lw    $a1, 4($sp)                            # restore $a1 from stack
+addiu $sp, $sp, 8                            # deallocate 2 words from stack
 
 heap_malloc_found:
 # update found chunk
@@ -170,21 +152,19 @@ j     heap_malloc_update_next
 
 heap_malloc_nosplit:
 # update free list
-lw   $t1, 8($t0)                             # get nextptr
-lw   $t2, 4($t0)                             # get prevptr
-beq  $t1, $zero, heap_malloc_ns_nextptr_null # if nextptr is null, skip
-sw   $t2, 4($t1)                             # next's prevptr = prevptr
+lw    $t1, 8($t0)                             # get nextptr
+lw    $t2, 4($t0)                             # get prevptr
+beq   $t1, $zero, heap_malloc_ns_nextptr_null # if nextptr is null, skip
+sw    $t2, 4($t1)                             # next's prevptr = prevptr
 heap_malloc_ns_nextptr_null:
-beq  $t2, $zero, heap_malloc_ns_prevptr_null # if prevptr not null {
-sw   $t1, 8($t2)                             #   prev's nextptr = nextptr
-j    heap_malloc_return                      # }
+beq   $t2, $zero, heap_malloc_ns_prevptr_null # if prevptr not null {
+sw    $t1, 8($t2)                             #   prev's nextptr = nextptr
+j     heap_malloc_return                      # }
 heap_malloc_ns_prevptr_null:                 # else,
-sw   $t1, 4($a0)                             #   first_free = nextptr
+sw    $t1, 4($a0)                             #   first_free = nextptr
 
 heap_malloc_return:
-lw   $ra, 0($sp)                             # retrieve ra from stack
-addi $sp, $sp, 4                             # deallocate a word from stack
-jr   $ra                                     # return
+jr    $ra                                     # return
 
 
 

@@ -94,7 +94,7 @@ heap_malloc_find_chunk:
   sltu  $t1, $t1, $a1                        # if chunk size + 16 !< desired size, aka if desired size <= chunk size + 16
   beq   $t1, $zero, heap_malloc_found        # break;
   lw    $t0, 8($t0)                          # else, get next
-  beq   $t0, $zero, heap_malloc_not_found    # if next is null, no chunks apply. TODO: sbrk more space
+  beq   $t0, $zero, heap_malloc_not_found    # if next is null, no chunks apply.
   j     heap_malloc_find_chunk               # else, continue
 
 heap_malloc_incorrect_size:

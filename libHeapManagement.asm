@@ -121,10 +121,6 @@ jr   $ra                                     # return
 
 
 
-
-
-
-
 # Function heap_free
 # Input:
 #     $a0: Pointer to heap_start.
@@ -193,7 +189,6 @@ beq   $t3, $zero, heap_free_bothFree        # if next neighbor unallocated, proc
 sw    $t1, 0($t2)                           # else, update footer size value
 j     return
 
-
 heap_free_bothFree:
 # fuse with next chunk
 addu  $t0, $t0, $t1                         # get sum of current chunk size and next chunk size
@@ -208,6 +203,7 @@ beq   $t3, $zero, return                    # if nextptr is NULL, done
 addiu $t0, $a1, -4                          # else, get p header pointer
 sw    $t0, 4($t3)                           # set p as p's next's prevptr
 j     return
+
 
 heap_free_nextFree:
 

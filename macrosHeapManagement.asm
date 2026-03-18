@@ -1,4 +1,5 @@
 .macro heap_init()
+  xor $a0, $a0, $a0
   jal heap_init
 .end_macro
 

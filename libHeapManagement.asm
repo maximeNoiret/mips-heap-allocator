@@ -3,9 +3,6 @@ ori	$v0,	$zero,	10				# load syscall code 10 (exit)
 syscall								# exit
 
 
-# TODO: setup global vars.
-
-
 # Function heap_init
 # Input:
 #     None  (potentially size of sbrk?)

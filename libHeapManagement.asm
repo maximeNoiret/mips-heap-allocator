@@ -19,7 +19,7 @@
 heap_init:
 addiu $sp, $sp, -4                           # allocate 1 word in stack
 sw    $s0, 0($sp)                            # store $s0
-addiu $s0, $zero, $a0                        # move $a0 into $s0
+addu  $s0, $zero, $a0                        # move $a0 into $s0
 # sbrk allocation
 ori   $v0, $zero, 9                          # load syscall code 9 (sbrk)
 ori   $a0, $zero, 4096                       # load value 4096 (to allocate 4096 bytes) [this might get replaced by arg]
@@ -107,7 +107,7 @@ addiu $sp, $sp, -8                           # allocate 2 words in stack
 sw    $a1, 4($sp)                            # store $a1
 sw    $ra, 0($sp)                            # store ra
 jal   heap_init                              # call init to expand program break
-addiu $t0, $zero, $v0                        # store resulting unallocated chunk pointer in $t0
+addu  $t0, $zero, $v0                        # store resulting unallocated chunk pointer in $t0
 lw    $ra, 0($sp)                            # restore $ra from stack
 lw    $a1, 4($sp)                            # restore $a1 from stack
 addiu $sp, $sp, 8                            # deallocate 2 words from stack

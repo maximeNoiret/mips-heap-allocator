@@ -164,9 +164,9 @@ andi  $t3, $t0, 1                           # check if next neighbor allocated
 beq   $t3, $zero, heap_free_firstChunkNext  # if unallocated, process firstChunk & nextFree case
 lw    $t0, 4($a0)                           # else, get first unallocated chunk
 # update free list
-sw    $a1, 4($t0)                           # set prevptr of that chunk to p
-sw    $t0, 4($a1)                           # set p's nextptr to that chunk
 addiu $a1, $a1, -4                          # get p header pointer
+sw    $a1, 4($t0)                           # set prevptr of that chunk to p
+sw    $t0, 8($a1)                           # set p's nextptr to that chunk
 sw    $a1, 4($a0)                           # update first_free to p header
 addiu $a1, $a1, 4                           # set p back
 j     return

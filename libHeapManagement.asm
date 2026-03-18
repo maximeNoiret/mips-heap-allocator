@@ -53,8 +53,8 @@ sw    $t1, 0($t2)                            #   store chunk size into footer
 bne   $s0, $zero, heap_init_return           # if first run, finish
 addiu $sp, $sp, -4                           # else, allocate 1 word in stack
 sw    $ra, 0($sp)                            # store $ra in stack
-addiu $a0, $zero, $s0                        # store heap_start in $a0
-addiu $a1, $zero, $v0                        # store chunk pointer in $a1
+addu  $a0, $zero, $s0                        # store heap_start in $a0
+addu  $a1, $zero, $v0                        # store chunk pointer in $a1
 jal   heap_free                              # call free(heap_start, chunk), returns pointer to unallocated chunk
 lw    $ra, 0($sp)                            # restore $ra from stack
 addiu $sp, $sp, 4                            # deallocate 1 word from stack

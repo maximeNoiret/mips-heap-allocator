@@ -98,7 +98,7 @@ heap_malloc_find_chunk:
   j     heap_malloc_find_chunk               # else, continue
 
 heap_malloc_incorrect_size:
-xor   $v0, $v0                               # set return value to 0
+xor   $v0, $v0, $v0                          # set return value to 0
 j     heap_malloc_return                     # return 0
 
 heap_malloc_not_found:

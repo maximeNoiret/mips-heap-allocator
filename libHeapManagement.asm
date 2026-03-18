@@ -1,23 +1,3 @@
-test:
-jal  heap_init               # call heap_init
-or   $s0, $zero, $v0         # save heap_start pointer
-
-or   $a0, $zero, $s0         # set heap_start as arg0
-ori  $a1, $zero, 24          # set 24 as size to allocate
-jal  heap_malloc             # malloc($s0, 24)
-addi $sp, $sp, -4            # allocate 4 bytes in stack
-sw   $v0, 0($sp)             # store pointer to allocated space in stack
-
-# test writing to allocated space
-lw   $t0, 0($sp)             # get space pointer
-ori  $t1, $t1, 100           # value 100
-sw   $t1, 0($t0)             # store 100 in allocated space?
-
-
-ori	 $v0, $zero, 10          # load syscall code 10 (exit)
-syscall                      # exit
-
-
 # Function heap_init
 # Input:
 #     None  (potentially size of sbrk?)
@@ -72,6 +52,10 @@ jr    $ra                    # return ($v0 is already what we want from sbrk sys
 # Note:
 #     $a0 is the POINTER to heap_start, not the actual value. This makes calls easier with data segment vars.
 heap_malloc:
+# save ra
+addi $sp, $sp, -4                            # allocate a word in stack
+sw   $ra, 0($sp)                             # store ra
+
 # check that $a1 is even
 andi $t0, $a1, 1                             # check even
 bnez $t0, heap_malloc_incorrect_size         # if $a1 off, return NULL (TODO)
@@ -129,6 +113,8 @@ sw    $t2, 4($a0)                            #   update first_free with split ch
 j     heap_malloc_update_next
 
 heap_malloc_return:
+lw   $ra, 0($sp)                             # retrieve ra from stack
+addi $sp, $sp, 4                             # deallocate a word from stack
 jr   $ra                                     # return
   
 

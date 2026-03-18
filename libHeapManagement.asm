@@ -25,7 +25,7 @@ ori   $v0, $zero, 9                          # load syscall code 9 (sbrk)
 ori   $a0, $zero, 4096                       # load value 4096 (to allocate 4096 bytes) [this might get replaced by arg]
 syscall                                      # sbrk 4096 bytes
 
-beq   $s0, $zero, heap_init_skip_metadata    # skip meta data if ran by malloc
+bne   $s0, $zero, heap_init_skip_metadata    # skip meta data if ran by malloc
 
 # setup heap metadata
 or    $t0, $zero, $v0                        # t0 = v0 for pointer arithmetic
@@ -50,7 +50,7 @@ addiu $t2, $t2, -1                           #   remove 1 to align to word-width
 heap_init_continue:                          # else,
 sw    $t1, 0($t2)                            #   store chunk size into footer
 
-bne   $s0, $zero, heap_init_return           # if first run, finish
+beq   $s0, $zero, heap_init_return           # if first run, finish
 addiu $sp, $sp, -4                           # else, allocate 1 word in stack
 sw    $ra, 0($sp)                            # store $ra in stack
 addu  $a0, $zero, $s0                        # store heap_start in $a0

@@ -113,8 +113,8 @@ sw    $t1, 0($t3)                            # store split size in split footer
 
 # TODO:
 #   - If prev is null, update first_free
-#   - Else, Iterate through previous neighbors until unallocated to update its next pointer
-#   - If next not null, Iterate through next neighbors until unallocated to update its prev pointer
+#   - Else, update prev's next pointer
+#   - If next not null, update next's prev pointer
 
 jr   $ra                                     # return
   

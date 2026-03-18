@@ -256,7 +256,7 @@ addu  $t1, $t0, $t1                         # get sum of previous chunk size and
 addiu $t1, $t1, 8                           # add 8 since 2 tags will be deleted
 sw    $t1, 0($t2)                           # update header size value
 addiu $t2, $t2, 4                           # goto chunk data section
-addiu $a1, $zero, $t2                       # set p to that
+addu  $a1, $zero, $t2                       # set p to that
 addu  $t2, $t2, $t1                         # goto footer
 lw    $t0, 4($t2)                           # get next chunk size
 andi  $t3, $t0, 1                           # check if next chunk is allocated
@@ -311,5 +311,5 @@ j     heap_free_return                          # }
 
 
 heap_free_return:
-addu  $v0, $a1, -4                              # set return value to header of p
+addiu  $v0, $a1, -4                              # set return value to header of p
 jr    $ra

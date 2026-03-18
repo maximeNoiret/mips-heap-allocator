@@ -180,7 +180,7 @@ j     heap_free_bothFree                    # go on to both free case
 heap_free_prevFree:
 # fuse with previous chunk
 subu  $t2, $a1, $t0                         # go back by size of previous chunk
-addiu $t2, $t0, -12                         # get previous header: go back p header, prev foot and prev header (3*4 = 12)
+addiu $t2, $t2, -12                         # get previous header: go back p header, prev foot and prev header (3*4 = 12)
 addu  $t1, $t0, $t1                         # get sum of previous chunk size and p size
 addiu $t1, $t1, 8                           # add 8 since 2 tags will be deleted
 sw    $t1, 0($t2)                           # update header size value

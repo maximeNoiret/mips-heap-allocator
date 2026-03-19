@@ -313,3 +313,29 @@ j     heap_free_return                          # }
 heap_free_return:
 addiu  $v0, $a1, -4                              # set return value to header of p
 jr    $ra
+
+
+
+# Function heap_realloc
+# Input:
+#     $a0: pointer to heap_start
+#     $a1: p pointer of target
+#     $a2: size
+# Output:
+#     None (for now ig)
+# Registers used:
+#     None
+heap_realloc:
+# TODO:
+#     - Check if next chunk unallocated and size is big enough.
+#     - If YES: simply expend current chunk.
+#       - Change size of p header
+#       - Move footer to new location
+#       - Update size of next chunk
+#       - Store new size in new header
+#       - Store new size in footer
+#       - return
+#     - Else: allocate a new chunk, copy over data, free previous chunk
+#       - n = malloc(size)
+#       - memcpy(n, p, p_size)
+#       - free(p)

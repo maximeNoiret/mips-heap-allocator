@@ -322,20 +322,60 @@ jr    $ra
 #     $a1: p pointer of target
 #     $a2: size
 # Output:
-#     None (for now ig)
+#     $v0: pointer to allocation
 # Registers used:
-#     None
+#     $t0: p size -> p footer
+#     $t1: next_size
 heap_realloc:
+# save ra
+addiu $sp, $sp, -4
+sw    $ra, 0(sp)
+
+lw    $t0, -4($a1)                     # load p size from p header
+beq   $a2, $t0, heap_realloc_return_p  # if size == p_size, return p
+
+sltu  $at, $a2, $t0                    # if size < p size,
+bne   $at, $zero, heap_realloc_shrink  # shrink chunk.
+
+addu  $t0, $t0, a1                     # else, go to footer
+lw    $t1, 4($t0)                      # load size of next chunk
+andi  $at, $t1, 1                      # check if allocated
+bne   $at, $zero, heap_realloc_move    # if allocated, malloc->memcpy->free
+# Extend chunk
+# TODO: extend current chunk
+j     heap_realloc_return_p
+
+heap_realloc_shrink:
+
+# TODO: shrink current chunk
+
+heap_realloc_move:
+
+# TODO: malloc->memcpy->free
+j     heap_realloc_return
+
+
 # TODO:
-#     - Check if next chunk unallocated and size is big enough.
+#     - If size == p-size, return p [DONE]
+#     - If size <  p-size, shrink&return p (and change next chunk's header and size)
+#     - Else, Check if next chunk unallocated and size is big enough.
 #     - If YES: simply expend current chunk.
 #       - Change size of p header
 #       - Move footer to new location
 #       - Update size of next chunk
 #       - Store new size in new header
 #       - Store new size in footer
-#       - return
+#       - return p
 #     - Else: allocate a new chunk, copy over data, free previous chunk
 #       - n = malloc(size)
 #       - memcpy(n, p, p_size)
 #       - free(p)
+#       - return n
+
+heap_realloc_return_p:
+or    $v0, $zero, $a1
+heap_realloc_return:
+# restore ra
+lw    $sp, 0($sp)
+addiu $sp, $sp, 4
+jr    $ra

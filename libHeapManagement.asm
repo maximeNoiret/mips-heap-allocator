@@ -324,8 +324,10 @@ jr    $ra
 # Output:
 #     $v0: pointer to allocation
 # Registers used:
-#     $t0: p size -> p footer
-#     $t1: next_size
+#     $t0: p size
+#     $t1: p footer
+#     $t2: next_size
+#     $t3: new p size
 heap_realloc:
 # save ra
 addiu $sp, $sp, -4
@@ -337,12 +339,23 @@ beq   $a2, $t0, heap_realloc_return_p  # if size == p_size, return p
 sltu  $at, $a2, $t0                    # if size < p size,
 bne   $at, $zero, heap_realloc_shrink  # shrink chunk.
 
-addu  $t0, $t0, a1                     # else, go to footer
-lw    $t1, 4($t0)                      # load size of next chunk
-andi  $at, $t1, 1                      # check if allocated
+addu  $t1, $t0, a1                     # else, go to footer
+lw    $t2, 4($t0)                      # load size of next chunk
+andi  $at, $t2, 1                      # check if allocated
 bne   $at, $zero, heap_realloc_move    # if allocated, malloc->memcpy->free
+addiu $t3, $t0, $a2                    # calculate new p size
+sltu  $at, $t2, $t3                    # check if next_size < new p_size
+bne   $at, $zero, heap_realloc_move    # if next_size < p size, malloc->memcpy->free
+
 # Extend chunk
-# TODO: extend current chunk
+sw    $t3, -4($a1)                     # Write new p size in p header
+subu  $t2, $t2, $a2                    # remove size from next_size
+addiu $t1, $t1, 4                      # get old next pointer
+addu  $t1, $t1, $a2                    # go to new next pointer location
+sw    $t3, -4($t1)                     # store new p size in p footer
+sw    $t2, 0($t1)                      # store new next size in next header
+addu  $t1, $t1, $t2                    # go to next footer
+sw    $t2, 4($t1)                      # store new next size in next footer
 j     heap_realloc_return_p
 
 heap_realloc_shrink:

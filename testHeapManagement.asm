@@ -27,27 +27,28 @@ main:
 heap_init()
 sw    $v0, heap
 
-addiu $sp, $sp, -64
-
 print("Malloc 16 bytes\n")
 malloc_LI(heap, 16)
-sw    $v0, 60($sp)
+or    $s0, $zero, $v0
+
+print("test Realloc to 16 bytes (same)\n")
+realloc_LRI(heap, $s0, 16)
+or    $s0, $zero, $v0
 
 print("test Realloc to 32 bytes\n")
-lw    $v0, 60($sp)
-realloc_LRI(heap, $v0, 32)
+realloc_LRI(heap, $s0, 32)
+or    $s0, $zero, $v0
 
 printL(cleanup)
-lw    $v0, 60($sp)
-free_LR(heap, $v0)
+free_LR(heap, $s0)
 
 print("Malloc 128 bytes\n")
 malloc_LI(heap, 128)
-sw    $v0, 60($sp)
+or    $s0, $zero, $v0
 
 print("test Realloc to 64 bytes\n")
-lw    $v0, 60($sp)
-realloc_LRI(heap, $v0, 64)
+realloc_LRI(heap, $s0, 64)
+or    $s0, $zero, $v0
 
 
 # exit

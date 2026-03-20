@@ -328,21 +328,20 @@ jr    $ra
 #     $t1: p footer
 #     $t2: next_size
 #     $t3: new p size
+# Note:
+#     $a1 gets updated in case of a move
 heap_realloc:
-# save ra
-addiu $sp, $sp, -4
-sw    $ra, 0($sp)
-
 lw    $t0, -4($a1)                     # load p size from p header
 addiu $t0, $t0, -1                     # remove allocated bit
-beq   $a2, $t0, heap_realloc_return_p  # if size == p_size, return p
+beq   $a2, $t0, heap_realloc_return    # if size == p_size, return
 addu  $t1, $t0, $a1                    # get to footer
 lw    $t2, 4($t1)                      # load size of next chunk
 
+j     heap_realloc_move                # [TEST, TO REMOVE]
 andi  $at, $t2, 1                      # check if next chunk allocated
 bne   $at, $zero, heap_realloc_move    # if allocated, malloc->memcpy->free
 sltu  $at, $a2, $t0                    # if size < p size,
-bne   $at, $zero, heap_realloc_shrink  # shrink chunk.
+bne   $at, $zero, heap_realloc_move    # malloc->memcpy->free [SHOULD shrink chunk but can't be bothered :3]
 sltu  $at, $t2, $a2                    # check if next_size < new p_size [FIXME: This breaks when it's exact. Need to add safety range]
 bne   $at, $zero, heap_realloc_move    # if next_size < p size, malloc->memcpy->free
 
@@ -358,25 +357,49 @@ sw    $t3, -4($t1)                     # store new p size in p footer
 sw    $t2, 0($t1)                      # store new next size in next header
 addu  $t1, $t1, $t2                    # go to next footer
 sw    $t2, 4($t1)                      # store new next size in next footer
-j     heap_realloc_return_p
+j     heap_realloc_return
 
-heap_realloc_shrink:
-addiu $t3, $a2, 1                      # mark new size as allocated
-sw    $t3, -4($a1)                     # Write new p size in p header
-subu  $t3, $t0, $a2                    # get p size - size
-addu  $t2, $t2, $t3                    # add size from next_size
-addiu $t1, $t1, 4                      # get old next pointer
-subu  $t1, $t1, $t3                    # go to new next pointer location
-addiu $t3, $a2, 1                      # mark new size as allocated
-sw    $t3, -4($t1)                     # store new p size in p footer
-sw    $t2, 0($t1)                      # store new next size in next header
-addu  $t1, $t1, $t2                    # go to next footer
-sw    $t2, 4($t1)                      # store new next size in next footer
-j     heap_realloc_return_p
+# heap_realloc_shrink:
+# addiu $t3, $a2, 1                      # mark new size as allocated
+# sw    $t3, -4($a1)                     # Write new p size in p header
+# subu  $t3, $t0, $a2                    # get p size - size
+# addu  $t2, $t2, $t3                    # add size from next_size
+# addiu $t1, $t1, 4                      # get old next pointer
+# subu  $t1, $t1, $t3                    # go to new next pointer location
+# addiu $t3, $a2, 1                      # mark new size as allocated
+# sw    $t3, -4($t1)                     # store new p size in p footer
+# sw    $t2, 0($t1)                      # store new next size in next header
+# addu  $t1, $t1, $t2                    # go to next footer
+# sw    $t2, 4($t1)                      # store new next size in next footer
+# j     heap_realloc_return
 
 heap_realloc_move:
-
-# TODO: malloc->memcpy->free
+# Function calling save boilerplace
+addiu $sp, $sp, -12
+sw    $s0, 8($sp)
+sw    $s1, 4($sp)
+sw    $ra, 0($sp)
+# malloc->memcpy->free
+or    $s0, $zero, $a1                          # save p into $s0
+or    $a1, $zero, $a2                          # put size into $a1 from $a2
+sltu  $at, $a2, $t0                            # check if size < p size
+beq   $at, $zero, heap_realloc_move_newsize    # if size >= p size,
+or    $a2, $zero, $t0                          #   place old size into $a2 for memcpy
+heap_realloc_move_newsize:
+jal   heap_malloc                              # malloc(heap, size)
+or    $a1, $zero, $s0                          # restore p from $s0
+or    $s0, $zero, $v0                          # save new p pointer into $s0
+or    $s1, $zero, $a0                          # save heap_start into $s1
+or    $a0, $zero, $s0                          # set destination as new p
+jal   mem_memcpy                               # memcpy(new_p, p, size)
+or    $a0, $zero, $s1                          # restore heap_start from $s1
+jal   heap_free                                # free(heap, p)
+or    $a1, $zero, $s0                          # p = new p
+# Function calling restore boilerplate 
+lw    $ra, 0($sp)
+lw    $s1, 4($sp)
+lw    $s0, 8($sp)
+addiu $sp, $sp, 12
 j     heap_realloc_return
 
 
@@ -397,10 +420,6 @@ j     heap_realloc_return
 #       - free(p)
 #       - return n
 
-heap_realloc_return_p:
-or    $v0, $zero, $a1
 heap_realloc_return:
-# restore ra
-lw    $ra, 0($sp)
-addiu $sp, $sp, 4
+or    $v0, $zero, $a1
 jr    $ra

@@ -17,10 +17,10 @@ or    $t2, $zero, $a1                     # save $a1
 
 mem_memcpy_loop:
   beq   $a2, $zero, mem_memcpy_endloop    # while size > 0 {
-  lw    $t0, 0($a1)                       #   load from source
-  sw    $t0, 0($a0)                       #   store to destination
-  addiu $a1, $a1, 4                       #   ++src_ptr
-  addiu $a0, $a0, 4                       #   ++dest_ptr
+  lb    $t0, 0($a1)                       #   load from source
+  sb    $t0, 0($a0)                       #   store to destination
+  addiu $a1, $a1, 1                       #   ++src_ptr
+  addiu $a0, $a0, 1                       #   ++dest_ptr
   addi  $a2, $a2, -1                      #   --size;
   j     mem_memcpy_loop                   # }
 

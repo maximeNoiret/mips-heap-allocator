@@ -339,11 +339,11 @@ beq   $a2, $t0, heap_realloc_return_p  # if size == p_size, return p
 addu  $t1, $t0, $a1                    # get to footer
 lw    $t2, 4($t1)                      # load size of next chunk
 
-sltu  $at, $a2, $t0                    # if size < p size,
-bne   $at, $zero, heap_realloc_shrink  # shrink chunk.
 andi  $at, $t2, 1                      # check if next chunk allocated
 bne   $at, $zero, heap_realloc_move    # if allocated, malloc->memcpy->free
-sltu  $at, $t2, $a2                    # check if next_size < new p_size
+sltu  $at, $a2, $t0                    # if size < p size,
+bne   $at, $zero, heap_realloc_shrink  # shrink chunk.
+sltu  $at, $t2, $a2                    # check if next_size < new p_size [FIXME: This breaks when it's exact. Need to add safety range]
 bne   $at, $zero, heap_realloc_move    # if next_size < p size, malloc->memcpy->free
 
 # Extend chunk
@@ -361,7 +361,6 @@ sw    $t2, 4($t1)                      # store new next size in next footer
 j     heap_realloc_return_p
 
 heap_realloc_shrink:
-# TODO: if p size - size > 32, create new unallocated chunk... bruh...
 addiu $t3, $a2, 1                      # mark new size as allocated
 sw    $t3, -4($a1)                     # Write new p size in p header
 subu  $t3, $t0, $a2                    # get p size - size
@@ -383,9 +382,9 @@ j     heap_realloc_return
 
 # TODO:
 #     - If size == p-size, return p [DONE]
-#     - If size <  p-size, shrink&return p (and change next chunk's header and size)
-#     - Else, Check if next chunk unallocated and size is big enough.
-#     - If YES: simply expend current chunk.
+#     - If size <  p-size, shrink&return p (and change next chunk's header and size) [DONE]
+#     - Else, Check if next chunk unallocated and size is big enough. [DONE]
+#     - If YES: simply expend current chunk. [DONE]
 #       - Change size of p header
 #       - Move footer to new location
 #       - Update size of next chunk

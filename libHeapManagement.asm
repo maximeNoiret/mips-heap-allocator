@@ -331,7 +331,7 @@ jr    $ra
 heap_realloc:
 # save ra
 addiu $sp, $sp, -4
-sw    $ra, 0(sp)
+sw    $ra, 0($sp)
 
 lw    $t0, -4($a1)                     # load p size from p header
 beq   $a2, $t0, heap_realloc_return_p  # if size == p_size, return p
